@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Rent Roll Auditor</title>
+<style>
+:root{--ink:#22303B;--paper:#F7F6F2;--card:#FFFFFF;--blue:#1B4F72;--blue2:#28618A;--wine:#74323E;--line:#D9D5CC;--ok:#2E6B4F;--warn:#8A5A1C;--bad:#8E2D2D;--mut:#6B7680}
+*{box-sizing:border-box}
+body{margin:0;font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--paper)}
+header{background:var(--blue);color:#F2EFE8;padding:26px 20px 22px}
+header .wrap,main{max-width:1060px;margin:0 auto;padding:0 8px}
+h1{margin:0;font-size:30px;letter-spacing:.2px}
+header p{margin:6px 0 0;color:#C9D6E0;max-width:70ch}
+main{padding:22px 8px 60px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:860px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px}
+.card h2{margin:0 0 8px;font-size:17px;color:var(--blue)}
+textarea{width:100%;height:150px;font:12px/1.45 ui-monospace,Menlo,Consolas,monospace;border:1px solid var(--line);border-radius:8px;padding:10px;resize:vertical;background:#FCFBF8}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:14px 0}
+button{font:600 15px/1 inherit;padding:11px 18px;border-radius:8px;border:1px solid var(--blue);background:var(--blue);color:#fff;cursor:pointer}
+button.ghost{background:#fff;color:var(--blue)}
+button:hover{background:var(--blue2)}
+button.ghost:hover{background:#EEF3F7;color:var(--blue)}
+select{font:inherit;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:#fff}
+label{font-size:14px;color:var(--mut)}
+.dial{display:flex;flex-direction:column;gap:4px}
+input[type=file]{font-size:13px}
+#banner,#trust{display:none;margin:18px 0;padding:16px 18px;border-radius:10px;font-size:20px;font-weight:700;letter-spacing:.3px}
+#banner{background:var(--wine);color:#F7E9EC}
+#trust{background:#3A2A12;color:#F3E2C4}
+#banner small,#trust small{display:block;font-size:14px;font-weight:400;margin-top:4px;opacity:.9}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin:18px 0}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.stat .k{font-size:13px;color:var(--mut)}
+.stat .v{font-size:26px;font-weight:700;color:var(--blue);margin-top:2px}
+.stat .v.bad{color:var(--bad)}
+table{width:100%;border-collapse:collapse;font-size:14px;margin:6px 0 2px}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);text-align:left;border-bottom:2px solid var(--line);padding:6px 8px}
+td{padding:6px 8px;border-bottom:1px solid var(--line)}
+td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
+.tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px}
+.tag.miss{background:#F4DEDE;color:var(--bad)}
+.tag.short{background:#F3E7D3;color:var(--warn)}
+.tag.late{background:#E2E9F0;color:var(--blue)}
+.sa{font:13px/1.5 ui-monospace,Menlo,Consolas,monospace;color:var(--mut);margin-top:16px}
+.sec{margin-top:22px}
+.sec h2{font-size:18px;color:var(--blue);margin:0 0 6px}
+.sec p.note{font-size:13px;color:var(--mut);margin:0 0 6px}
+#results{display:none}
+.refuse li{font:13px/1.6 ui-monospace,Menlo,Consolas,monospace}
+footer{border-top:1px solid var(--line);margin-top:40px;padding-top:14px;font-size:13px;color:var(--mut)}
+.badge{display:inline-block;font-size:12px;font-weight:700;color:#fff;background:var(--wine);border-radius:6px;padding:3px 9px;margin-left:8px;vertical-align:middle}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+<h1>The Rent Roll Auditor <span class="badge">runs entirely on your computer</span></h1>
+<p>Two exports — the rent roll and the payments ledger — and every rent payment has to prove which month it paid. Missing months, short months, habitual lates, duplicate deposits, orphan payments and holdovers, each with a name and a dollar amount. Nothing leaves this page.</p>
+</div></header>
+<main>
+<div class="grid">
+<div class="card"><h2>1 · Rent roll CSV</h2>
+<p class="note" style="font-size:13px;color:var(--mut);margin:0 0 8px">Header: <code>unit,tenant,monthly_rent,lease_start,lease_end,deposit</code> — blank lease_end = month-to-month.</p>
+<textarea id="roll" spellcheck="false" placeholder="unit,tenant,monthly_rent,lease_start,lease_end,deposit"></textarea>
+<div class="row"><input type="file" id="rollfile" accept=".csv,text/csv"></div></div>
+<div class="card"><h2>2 · Payments CSV</h2>
+<p class="note" style="font-size:13px;color:var(--mut);margin:0 0 8px">Header: <code>payment_id,date,unit,amount,method</code> — ISO dates (2026-03-02).</p>
+<textarea id="pay" spellcheck="false" placeholder="payment_id,date,unit,amount,method"></textarea>
+<div class="row"><input type="file" id="payfile" accept=".csv,text/csv"></div></div>
+</div>
+<div class="row" style="margin-top:18px">
+<div class="dial"><label for="grace">Grace period (late after)</label>
+<select id="grace"><option value="3">the 4th</option><option value="5" selected>the 6th</option><option value="10">the 11th</option></select></div>
+<div class="dial"><label for="tol">Forgive shortfalls up to</label>
+<select id="tol"><option value="0">$0</option><option value="500" selected>$5</option><option value="2000">$20</option></select></div>
+<div class="dial"><label for="rep">Chronically late after</label>
+<select id="rep"><option value="2">2 late months</option><option value="3" selected>3 late months</option><option value="5">5 late months</option></select></div>
+<button id="run">Audit the books</button>
+<button id="sample" class="ghost">Load the sample portfolio</button>
+</div>
+<div id="banner">DO NOT CALL THIS COLLECTED<small id="bannersub"></small></div>
+<div id="trust">DO NOT TRUST THIS AUDIT<small id="trustsub"></small></div>
+<div id="results">
+<div class="stats">
+<div class="stat"><div class="k">Scheduled rent (audit window)</div><div class="v" id="s_sched"></div></div>
+<div class="stat"><div class="k">Applied to rent</div><div class="v" id="s_coll"></div></div>
+<div class="stat"><div class="k">Uncollected</div><div class="v bad" id="s_unc"></div></div>
+<div class="stat"><div class="k">Audit through</div><div class="v" id="s_end"></div></div>
+</div>
+<div class="sec"><h2>Who is behind</h2>
+<p class="note">One row per unit with money open at the end of the window — the oldest open month tells you when they fell behind.</p>
+<table id="t_arrears"><thead><tr><th>Unit</th><th>Tenant</th><th class="r">Behind</th><th>Oldest open month</th><th class="r">Open months</th></tr></thead><tbody></tbody></table></div>
+<div class="grid sec">
+<div><h2>Missed &amp; short months</h2>
+<table id="t_months"><thead><tr><th>Unit</th><th>Tenant</th><th>Month</th><th></th><th class="r">Open</th></tr></thead><tbody></tbody></table></div>
+<div><h2>Chronically late</h2>
+<p class="note">Months count as late when the rent was not fully in by the grace day; the dial decides how many make it chronic.</p>
+<table id="t_chronic"><thead><tr><th>Unit</th><th>Tenant</th><th class="r">Late months</th></tr></thead><tbody></tbody></table>
+<h2 style="margin-top:18px">Held &amp; stray money</h2>
+<table id="t_stray"><thead><tr><th>What</th><th>Payment</th><th>Unit</th><th>Date</th><th class="r">Amount</th></tr></thead><tbody></tbody></table></div>
+</div>
+<div class="sec"><h2>Late months (detail)</h2>
+<table id="t_late"><thead><tr><th>Unit</th><th>Month</th><th>Rent fully in on</th></tr></thead><tbody></tbody></table></div>
+<div class="sec"><h2>Refused rows</h2>
+<p class="note">Rows the auditor could not vouch for. Refused out loud, never guessed at.</p>
+<ul class="refuse" id="refusals"></ul></div>
+<div class="sa" id="selfaudit"></div>
+</div>
+<footer>Sample portfolio (“Quillbrook Properties”) is fictional — every flaw in it was planted on purpose. Built on camera for the <em>Build It With AI</em> series; the prompts ride along in the download.</footer>
+</main>
+<script>
+/* EP40 Rent Roll Auditor — engine (the law, prompt 3). Pure, deterministic. */
+(function (root) {
+  function parseCents(s) {
+    if (s == null) return null;
+    const t = String(s).trim().replace(/^\$/, "").replace(/,/g, "");
+    if (!/^-?\d+(\.\d{1,2})?$/.test(t)) return null;
+    const neg = t.startsWith("-");
+    const [w, f = ""] = t.replace("-", "").split(".");
+    let c = parseInt(w, 10) * 100 + (f ? parseInt((f + "00").slice(0, 2), 10) : 0);
+    return neg ? -c : c;
+  }
+  const DIM = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  function daysInMonth(y, m) { return m === 2 && ((y % 4 === 0 && y % 100 !== 0) || y % 400 === 0) ? 29 : DIM[m - 1]; }
+  function parseDate(s) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s).trim());
+    if (!m) return null;
+    const y = +m[1], mo = +m[2], d = +m[3];
+    if (mo < 1 || mo > 12 || d < 1 || d > daysInMonth(y, mo)) return null;
+    return { y, mo, d, key: m[1] + "-" + m[2], iso: s.trim() };
+  }
+  const mkey = (y, mo) => y + "-" + String(mo).padStart(2, "0");
+  const monthIndex = (y, mo) => y * 12 + (mo - 1);
+  function roundHalfUpDiv(num, den) { return Math.floor((num * 2 + den) / (2 * den)); } // num,den>0 ints
+  function splitCSV(text) {
+    // simple CSV: no embedded newlines; honors double quotes
+    const lines = text.replace(/\r\n?/g, "\n").split("\n").filter(l => l.trim() !== "");
+    return lines.map(line => {
+      const out = []; let cur = "", q = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (q) { if (ch === '"') { if (line[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += ch; }
+        else if (ch === '"') q = true;
+        else if (ch === ",") { out.push(cur); cur = ""; }
+        else cur += ch;
+      }
+      out.push(cur);
+      return out.map(c => c.trim());
+    });
+  }
+  function headerMap(cols, wanted) {
+    const idx = {};
+    wanted.forEach(w => { idx[w] = cols.findIndex(c => c.toLowerCase() === w); });
+    return wanted.every(w => idx[w] >= 0) ? idx : null;
+  }
+
+  function audit(rollText, payText, opts) {
+    const grace = opts && opts.grace != null ? opts.grace : 5;        // 3 | 5 | 10
+    const tol = opts && opts.tolerance != null ? opts.tolerance : 0;  // cents: 0 | 500 | 2000
+    const repeat = opts && opts.repeat != null ? opts.repeat : 3;     // 2 | 3 | 5
+
+    const out = { refusals_roll: [], refusals_pay: [], missed: [], short: [], late: [], chronic: [],
+      dup_held: [], orphans: [], unapplied: [], holdover: [], counts: {}, self_audit: "OK" };
+
+    // ---- rent roll ----
+    const rollRows = splitCSV(rollText);
+    if (!rollRows.length) return { fatal: "rent roll file is empty" };
+    const rh = headerMap(rollRows[0], ["unit", "tenant", "monthly_rent", "lease_start", "lease_end", "deposit"]);
+    if (!rh) return { fatal: "rent roll header must be unit,tenant,monthly_rent,lease_start,lease_end,deposit" };
+    const leases = new Map(); let rollOk = 0;
+    for (let i = 1; i < rollRows.length; i++) {
+      const r = rollRows[i], line = i + 1;
+      const refuse = reason => out.refusals_roll.push({ line, reason });
+      const unit = r[rh.unit], tenant = r[rh.tenant];
+      if (!unit) { refuse("unit is blank"); continue; }
+      if (!tenant) { refuse("tenant is blank"); continue; }
+      const rent = parseCents(r[rh.monthly_rent]);
+      if (rent == null || rent <= 0) { refuse("monthly_rent missing or not a positive amount — unit " + unit); continue; }
+      const ls = parseDate(r[rh.lease_start]);
+      if (!ls) { refuse("lease_start is not a real ISO date — unit " + unit); continue; }
+      let le = null;
+      if ((r[rh.lease_end] || "").trim() !== "") {
+        le = parseDate(r[rh.lease_end]);
+        if (!le) { refuse("lease_end is not a real ISO date — unit " + unit); continue; }
+        if (le.iso < ls.iso) { refuse("lease_end is before lease_start — unit " + unit); continue; }
+      }
+      if (leases.has(unit)) { refuse("duplicate unit " + unit + " — row refused, first row kept"); continue; }
+      leases.set(unit, { unit, tenant, rent, ls, le });
+      rollOk++;
+    }
+
+    // ---- payments ----
+    const payRows = splitCSV(payText);
+    if (!payRows.length) return { fatal: "payments file is empty" };
+    const ph = headerMap(payRows[0], ["payment_id", "date", "unit", "amount", "method"]);
+    if (!ph) return { fatal: "payments header must be payment_id,date,unit,amount,method" };
+    const seenIds = new Set(); const pays = []; let payOk = 0;
+    for (let i = 1; i < payRows.length; i++) {
+      const r = payRows[i], line = i + 1;
+      const refuse = reason => out.refusals_pay.push({ line, reason });
+      const id = r[ph.payment_id];
+      if (!id) { refuse("payment_id is blank"); continue; }
+      if (seenIds.has(id)) { refuse("duplicate payment_id " + id + " — later row refused"); continue; }
+      const dt = parseDate(r[ph.date]);
+      if (!dt) { refuse("date “" + (r[ph.date] || "") + "” is not a real ISO date — payment " + id); continue; }
+      const unit = r[ph.unit];
+      if (!unit) { refuse("unit is blank — payment " + id); continue; }
+      const amt = parseCents(r[ph.amount]);
+      if (amt == null) { refuse("amount “" + (r[ph.amount] || "") + "” is not a number — payment " + id); continue; }
+      if (amt < 0) { refuse("negative amount — this auditor reads rent income, not refunds — payment " + id); continue; }
+      if (amt === 0) { refuse("zero amount — payment " + id); continue; }
+      seenIds.add(id);
+      pays.push({ id, dt, unit, amt });
+      payOk++;
+    }
+    if (!pays.length) return { fatal: "no valid payment rows" };
+
+    // ---- audit window ----
+    let asOf = pays[0].dt;
+    for (const p of pays) if (p.dt.iso > asOf.iso) asOf = p.dt;
+    let endY = asOf.y, endM = asOf.mo;
+    if (asOf.d < daysInMonth(asOf.y, asOf.mo)) { endM -= 1; if (endM === 0) { endM = 12; endY -= 1; } }
+    const endIdx = monthIndex(endY, endM);
+    out.audit_end = mkey(endY, endM);
+
+    // owed months per lease
+    for (const L of leases.values()) {
+      L.months = [];
+      let y = L.ls.y, mo = L.ls.mo;
+      const stopIdx = L.le ? Math.min(monthIndex(L.le.y, L.le.mo), endIdx) : endIdx;
+      while (monthIndex(y, mo) <= stopIdx) {
+        const dim = daysInMonth(y, mo);
+        let owed = L.rent, firstMonth = (y === L.ls.y && mo === L.ls.mo);
+        if (firstMonth && L.ls.d > 1) owed = roundHalfUpDiv(L.rent * (dim - L.ls.d + 1), dim);
+        if (L.le && y === L.le.y && mo === L.le.mo && L.le.d < dim) {
+          const frac = roundHalfUpDiv(L.rent * L.le.d, dim);
+          owed = firstMonth && L.ls.d > 1 ? roundHalfUpDiv(L.rent * (L.le.d - L.ls.d + 1), dim) : frac;
+        }
+        L.months.push({ key: mkey(y, mo), owed, paid: 0, allocs: [], firstMonth, y, mo });
+        mo += 1; if (mo === 13) { mo = 1; y += 1; }
+      }
+      L.credit = 0;
+    }
+
+    // ---- allocation ----
+    pays.sort((a, b) => a.dt.iso < b.dt.iso ? -1 : a.dt.iso > b.dt.iso ? 1 : a.id < b.id ? -1 : 1);
+    const seenKey = new Set(); let allocated = 0, dupC = 0, orphC = 0;
+    for (const p of pays) {
+      const dkey = p.unit + "|" + p.dt.iso + "|" + p.amt;
+      if (seenKey.has(dkey)) { out.dup_held.push({ payment_id: p.id, unit: p.unit, date: p.dt.iso, cents: p.amt }); dupC += p.amt; continue; }
+      seenKey.add(dkey);
+      const L = leases.get(p.unit);
+      if (!L) { out.orphans.push({ payment_id: p.id, unit: p.unit, date: p.dt.iso, cents: p.amt }); orphC += p.amt; continue; }
+      if (L.le && p.dt.iso > L.le.iso) out.holdover.push({ payment_id: p.id, unit: p.unit, date: p.dt.iso });
+      let rem = p.amt;
+      for (const M of L.months) {
+        if (rem === 0) break;
+        const bal = M.owed - M.paid;
+        if (bal <= 0) continue;
+        const take = Math.min(bal, rem);
+        M.paid += take; rem -= take; allocated += take;
+        M.allocs.push({ date: p.dt.iso, paidAfter: M.paid });
+      }
+      L.credit += rem;
+    }
+
+    // ---- findings ----
+    let scheduled = 0, uncollected = 0, lateTotal = 0;
+    const chronicMap = new Map();
+    const units = [...leases.values()].sort((a, b) => (+a.unit || 0) - (+b.unit || 0) || (a.unit < b.unit ? -1 : 1));
+    for (const L of units) {
+      for (const M of L.months) {
+        scheduled += M.owed;
+        const bal = M.owed - M.paid;
+        if (bal === M.owed && M.owed > 0) { out.missed.push({ unit: L.unit, tenant: L.tenant, month: M.key, cents: bal }); uncollected += bal; continue; }
+        if (bal > tol) { out.short.push({ unit: L.unit, tenant: L.tenant, month: M.key, cents_short: bal }); uncollected += bal; continue; }
+        // paid in full (net of tolerance): late? completion = first payment that
+        // brought the month's allocated total to >= owed - tolerance
+        if (M.owed > tol) {
+          let completion = null;
+          for (const a of M.allocs) if (a.paidAfter >= M.owed - tol) { completion = a.date; break; }
+          const graceEnd = M.firstMonth && L.ls.d > 1
+            ? (() => { // lease_start + grace days
+                let y = L.ls.y, mo = L.ls.mo, d = L.ls.d + grace;
+                while (d > daysInMonth(y, mo)) { d -= daysInMonth(y, mo); mo += 1; if (mo === 13) { mo = 1; y += 1; } }
+                return mkey(y, mo) + "-" + String(d).padStart(2, "0");
+              })()
+            : M.key + "-" + String(1 + grace).padStart(2, "0");
+          if (completion && completion > graceEnd) {
+            out.late.push({ unit: L.unit, month: M.key, paid_day: completion });
+            lateTotal += 1;
+            chronicMap.set(L.unit, (chronicMap.get(L.unit) || 0) + 1);
+          }
+        }
+      }
+      if (L.credit > 0) out.unapplied.push({ unit: L.unit, cents: L.credit });
+    }
+    for (const L of units) {
+      const n = chronicMap.get(L.unit) || 0;
+      if (n >= repeat) out.chronic.push({ tenant: L.tenant, unit: L.unit, n });
+    }
+    out.late_count = lateTotal;
+    out.scheduled_cents = scheduled;
+    out.collected_cents = allocated;
+    out.uncollected_cents = uncollected;
+    out.pct_uncollected = scheduled > 0 ? roundHalfUpDiv(uncollected * 1000, scheduled) / 10 : 0;
+    out.banner = uncollected * 20 > scheduled; // > 5%
+    out.counts = { roll_total: rollRows.length - 1, roll_ok: rollOk, pay_total: payRows.length - 1, pay_ok: payOk };
+
+    // ---- self-audit ----
+    const sa = [];
+    if (rollOk + out.refusals_roll.length !== rollRows.length - 1) sa.push("rent roll rows do not re-tally");
+    if (payOk + out.refusals_pay.length !== payRows.length - 1) sa.push("payment rows do not re-tally");
+    const validTotal = pays.reduce((s, p) => s + p.amt, 0);
+    const unappliedTotal = out.unapplied.reduce((s, u) => s + u.cents, 0);
+    if (allocated + unappliedTotal + dupC + orphC !== validTotal) sa.push("conservation check failed: allocated + credit + held + orphans != valid payments");
+    // recount suspects independently from the month grid
+    let recount = 0, recountCents = 0;
+    for (const L of units) for (const M of L.months) {
+      const bal = M.owed - M.paid;
+      if ((bal === M.owed && M.owed > 0) || bal > tol) { recount += 1; recountCents += bal; }
+    }
+    if (recount !== out.missed.length + out.short.length || recountCents !== uncollected)
+      sa.push("suspect recount mismatch");
+    // a file this unreadable cannot be vouched for
+    if (out.refusals_pay.length * 4 > payRows.length - 1) sa.push("more than a quarter of the payment rows were unreadable");
+    if (out.refusals_roll.length * 4 > rollRows.length - 1) sa.push("more than a quarter of the rent roll rows were unreadable");
+    if (sa.length) { out.self_audit = sa.join("; "); out.trust_banner = true; }
+    // deterministic sort orders
+    const byUM = (a, b) => (+a.unit || 0) - (+b.unit || 0) || (a.unit < b.unit ? -1 : a.unit > b.unit ? 1 : 0) || (a.month < b.month ? -1 : 1);
+    out.missed.sort(byUM); out.short.sort(byUM); out.late.sort(byUM);
+    out.dup_held.sort((a, b) => a.payment_id < b.payment_id ? -1 : 1);
+    out.orphans.sort((a, b) => a.payment_id < b.payment_id ? -1 : 1);
+    out.holdover.sort((a, b) => a.payment_id < b.payment_id ? -1 : 1);
+    return out;
+  }
+  const api = { audit, parseCents, parseDate };
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
+  else root.RentAudit = api;
+})(typeof globalThis !== "undefined" ? globalThis : this);
+
+</script>
+<script>
+const SAMPLE_ROLL = "unit,tenant,monthly_rent,lease_start,lease_end,deposit\r\n1,Oren Vasquez,1250.00,2026-01-01,,1250.00\r\n2,Margo Teale,1300.00,2026-01-01,,1300.00\r\n3,Hector Brame,1200.00,2026-01-01,,1200.00\r\n4,June Okafor,1375.00,2026-01-01,,1375.00\r\n5,Silas Pinter,1375.00,2026-01-01,,1375.00\r\n6,Ruth Calloway,1150.00,2026-01-01,,1150.00\r\n7,Delia Marsh,1650.00,2026-01-01,,1650.00\r\n8,Tomas Reyburn,1225.00,2026-01-01,,1225.00\r\n9,Nadia Ferris,1250.00,2026-01-01,2026-08-31,1250.00\r\n10,Gus Pemberly,1400.00,2026-01-01,,1400.00\r\n11,Winnie Zhao,1400.00,2026-01-01,,1400.00\r\n12,Caleb Stroud,1300.00,2026-01-01,,1300.00\r\n13,Ada Quint,1150.00,2026-03-15,,1150.00\r\n14,Bea Harlow,1500.00,2026-01-01,,1500.00\r\n15,Vera Moss,,2026-01-01,,1150.00\r\n3,Hector Brame,1200.00,2026-01-01,,1200.00\r\n";
+const SAMPLE_PAY = "payment_id,date,unit,amount,method\r\nP-0001,2026-01-01,1,1250.00,ach\r\nP-0002,2026-01-01,12,1300.00,ach\r\nP-0003,2026-01-02,11,1400.00,ach\r\nP-0004,2026-01-02,14,760.00,check\r\nP-0005,2026-01-02,14,740.00,ach\r\nP-0006,2026-01-02,2,1300.00,ach\r\nP-0007,2026-01-02,4,1375.00,ach\r\nP-0008,2026-01-02,5,1375.00,ach\r\nP-0009,2026-01-02,7,1650.00,check\r\nP-0010,2026-01-02,9,1250.00,ach\r\nP-0011,2026-01-03,3,1200.00,ach\r\nP-0012,2026-01-03,6,1150.00,ach\r\nP-0013,2026-01-04,8,1225.00,ach\r\nP-0014,2026-01-15,10,1400.00,check\r\nP-0015,2026-01-28,2,1300.00,ach\r\nP-0016,2026-02-01,12,1300.00,ach\r\nP-0017,2026-02-02,1,1250.00,ach\r\nP-0018,2026-02-02,11,1400.00,ach\r\nP-0019,2026-02-02,3,1200.00,ach\r\nP-0020,2026-02-02,7,1650.00,check\r\nP-0021,2026-02-02,9,1250.00,ach\r\nP-0022,2026-02-03,14,760.00,check\r\nP-0023,2026-02-03,14,740.00,ach\r\nP-0024,2026-02-03,4,1375.00,ach\r\nP-0025,2026-02-03,5,1375.00,ach\r\nP-0026,2026-02-03,6,1150.00,ach\r\nP-0027,2026-02-04,8,1225.00,ach\r\nP-0028,2026-02-17,10,1400.00,check\r\nP-0029,2026-02-28,2,1300.00,ach\r\nP-0030,2026-03-01,12,1300.00,ach\r\nP-0031,2026-03-01,4,1375.00,ach\r\nP-0032,2026-03-02,11,1400.00,ach\r\nP-0033,2026-03-02,3,1150.00,ach\r\nP-0034,2026-03-02,5,1375.00,ach\r\nP-0035,2026-03-02,5,1375.00,ach\r\nP-0036,2026-03-02,7,1650.00,check\r\nP-0037,2026-03-02,9,1250.00,ach\r\nP-0038,2026-03-03,1,1250.00,ach\r\nP-0039,2026-03-03,6,1150.00,ach\r\nP-0040,2026-03-04,8,1225.00,ach\r\nP-0041,2026-03-12,14,760.00,check\r\nP-0042,2026-03-12,14,740.00,ach\r\nP-0043,2026-03-14,10,1400.00,check\r\nP-0044,2026-03-16,13,630.65,ach\r\nP-0045,2026-03-28,2,1300.00,ach\r\nP-0046,2026-04-01,1,1250.00,ach\r\nP-0047,2026-04-01,12,1300.00,ach\r\nP-0048,2026-04-02,11,1400.00,ach\r\nP-0049,2026-04-02,13,1150.00,ach\r\nP-0050,2026-04-02,14,760.00,check\r\nP-0051,2026-04-02,14,740.00,ach\r\nP-0052,2026-04-02,3,1150.00,ach\r\nP-0053,2026-04-02,7,1650.00,check\r\nP-0054,2026-04-02,9,1250.00,ach\r\nP-0055,2026-04-03,6,1150.00,ach\r\nP-0056,2026-04-04,8,1225.00,ach\r\nP-0057,2026-04-08,10,1400.00,check\r\nP-0058,2026-04-09,4,1375.00,ach\r\nP-0059,2026-04-28,2,1300.00,ach\r\nP-0060,2026-05-01,12,1300.00,ach\r\nP-0061,2026-05-01,5,1375.00,ach\r\nP-0062,2026-05-02,1,1250.00,ach\r\nP-0063,2026-05-02,13,1150.00,ach\r\nP-0064,2026-05-02,3,1150.00,ach\r\nP-0065,2026-05-02,4,1375.00,ach\r\nP-0066,2026-05-02,7,1650.00,check\r\nP-0067,2026-05-02,9,1250.00,ach\r\nP-0068,2026-05-03,6,1150.00,ach\r\nP-0069,2026-05-04,8,1225.00,ach\r\nP-0070,2026-05-13,14,760.00,check\r\nP-0071,2026-05-13,14,740.00,ach\r\nP-0072,2026-05-19,10,1400.00,check\r\nP-0073,2026-05-28,2,1300.00,ach\r\nP-0074,2026-06-01,1,1250.00,ach\r\nP-0075,2026-06-01,12,1300.00,ach\r\nP-0076,2026-06-02,11,1400.00,ach\r\nP-0077,2026-06-02,13,1150.00,ach\r\nP-0078,2026-06-02,3,1150.00,ach\r\nP-0079,2026-06-02,5,1375.00,ach\r\nP-0080,2026-06-02,7,1650.00,check\r\nP-0081,2026-06-02,9,1250.00,ach\r\nP-0082,2026-06-03,14,760.00,check\r\nP-0083,2026-06-03,14,740.00,ach\r\nP-0084,2026-06-03,4,1375.00,ach\r\nP-0085,2026-06-03,6,1146.00,ach\r\nP-0086,2026-06-04,8,1225.00,ach\r\nP-0087,2026-06-16,10,1400.00,check\r\nP-0088,2026-06-28,2,1300.00,ach\r\nP-0089,2026-07-01,12,1300.00,ach\r\nP-0090,2026-07-01,4,1375.00,ach\r\nP-0091,2026-07-01,5,1375.00,ach\r\nP-0092,2026-07-02,11,1400.00,ach\r\nP-0093,2026-07-02,13,1150.00,ach\r\nP-0094,2026-07-02,14,760.00,check\r\nP-0095,2026-07-02,14,740.00,ach\r\nP-0096,2026-07-02,3,1150.00,ach\r\nP-0097,2026-07-02,7,1650.00,check\r\nP-0098,2026-07-02,9,1250.00,ach\r\nP-0099,2026-07-03,1,1250.00,ach\r\nP-0100,2026-07-03,6,1150.00,ach\r\nP-0101,2026-07-04,8,1225.00,ach\r\nP-0102,2026-07-06,10,1400.00,check\r\nP-0103,2026-07-06,12B,1300.00,ach\r\nP-0104,2026-07-28,2,1300.00,ach\r\nP-0105,2026-08-01,1,1250.00,ach\r\nP-0106,2026-08-01,12,1300.00,ach\r\nP-0107,2026-08-02,11,1400.00,ach\r\nP-0108,2026-08-02,3,1150.00,ach\r\nP-0109,2026-08-02,4,1375.00,ach\r\nP-0110,2026-08-02,9,1250.00,ach\r\nP-0111,2026-08-03,5,1375.00,ach\r\nP-0112,2026-08-03,6,1150.00,ach\r\nP-0113,2026-08-04,8,1225.00,ach\r\nP-0114,2026-08-14,14,760.00,check\r\nP-0115,2026-08-14,14,740.00,ach\r\nP-0116,2026-08-20,10,1400.00,check\r\nP-0117,2026-08-28,2,1300.00,ach\r\nP-0118,2026-09-01,12,1300.00,ach\r\nP-0119,2026-09-02,1,1250.00,ach\r\nP-0120,2026-09-02,11,1400.00,ach\r\nP-0121,2026-09-02,3,1150.00,ach\r\nP-0122,2026-09-02,5,1375.00,ach\r\nP-0123,2026-09-02,9,1250.00,ach\r\nP-0124,2026-09-03,14,760.00,check\r\nP-0125,2026-09-03,14,740.00,ach\r\nP-0126,2026-09-03,6,1150.00,ach\r\nP-0127,2026-09-04,8,1207.00,ach\r\nP-0128,2026-09-11,4,1375.00,ach\r\nP-0129,2026-09-18,10,1400.00,check\r\nP-0130,2026-09-28,2,1300.00,ach\r\nP-0131,2026-10-01,1,1250.00,ach\r\nP-0132,2026-10-01,12,1300.00,ach\r\nP-0133,2026-10-01,5,1375.00,ach\r\nP-0134,2026-10-02,10,1400.00,check\r\nP-0135,2026-10-02,11,1400.00,ach\r\nP-0136,2026-10-02,14,760.00,check\r\nP-0137,2026-10-02,3,1150.00,ach\r\nP-0138,2026-10-02,9,1250.00,ach\r\nP-0139,2026-10-03,4,1375.00,ach\r\nP-0140,2026-10-03,6,1150.00,ach\r\nP-0141,2026-10-04,8,1225.00,ach\r\nP-0142,2026-11-02,14,740.00,ach\r\nP-0007,2026-04-03,12,1300.00,ach\r\nP-0144,2026-02-30,4,1375.00,ach\r\nP-0145,7/15/2026,6,1150.00,ach\r\nP-0146,2026-05-04,8,—,check\r\nP-0147,2026-06-11,10,-200.00,ach\r\nP-0148,2026-08-02,1,0.00,ach\r\n";
+const $ = id => document.getElementById(id);
+const fmt = c => (c/100).toLocaleString("en-US",{style:"currency",currency:"USD"});
+function readFileInto(input, ta){ input.addEventListener("change", () => { const f = input.files[0]; if(!f) return;
+  const r = new FileReader(); r.onload = () => { ta.value = r.result; }; r.readAsText(f); }); }
+readFileInto($("rollfile"), $("roll")); readFileInto($("payfile"), $("pay"));
+$("sample").addEventListener("click", () => { $("roll").value = SAMPLE_ROLL; $("pay").value = SAMPLE_PAY; });
+function trow(tb, cells, classes){ const tr = document.createElement("tr");
+  cells.forEach((c,i) => { const td = document.createElement("td"); if(classes && classes[i]) td.className = classes[i];
+    if (c instanceof Node) td.appendChild(c); else td.textContent = c; tr.appendChild(td); }); tb.appendChild(tr); }
+function tag(kind, text){ const s = document.createElement("span"); s.className = "tag "+kind; s.textContent = text; return s; }
+$("run").addEventListener("click", () => {
+  const r = RentAudit.audit($("roll").value, $("pay").value, {
+    grace:+$("grace").value, tolerance:+$("tol").value, repeat:+$("rep").value });
+  const show = (el,on) => el.style.display = on ? "block" : "none";
+  if (r.fatal){ show($("trust"),true); $("trustsub").textContent = r.fatal; show($("banner"),false); show($("results"),false); return; }
+  show($("trust"), !!r.trust_banner); if (r.trust_banner) $("trustsub").textContent = r.self_audit;
+  show($("results"), !r.trust_banner);
+  show($("banner"), r.banner && !r.trust_banner);
+  $("bannersub").textContent = fmt(r.uncollected_cents)+" — "+r.pct_uncollected.toFixed(1)+"% of the scheduled rent — is not in. Past 5%, this page refuses to call the window collected.";
+  if (r.trust_banner) return;
+  $("s_sched").textContent = fmt(r.scheduled_cents);
+  $("s_coll").textContent = fmt(r.collected_cents);
+  $("s_unc").textContent = fmt(r.uncollected_cents)+" ("+r.pct_uncollected.toFixed(1)+"%)";
+  $("s_end").textContent = r.audit_end;
+  const arr = new Map();
+  for (const m of r.missed){ const a = arr.get(m.unit)||{t:m.tenant,c:0,first:m.month,n:0}; a.c+=m.cents; a.n++; if(m.month<a.first)a.first=m.month; arr.set(m.unit,a); }
+  for (const s of r.short){ const a = arr.get(s.unit)||{t:s.tenant,c:0,first:s.month,n:0}; a.c+=s.cents_short; a.n++; if(s.month<a.first)a.first=s.month; arr.set(s.unit,a); }
+  const tbA = $("t_arrears").querySelector("tbody"); tbA.innerHTML = "";
+  [...arr.entries()].sort((x,y)=>y[1].c-x[1].c).forEach(([u,a]) => trow(tbA,[u,a.t,fmt(a.c),a.first,String(a.n)],[null,null,"r",null,"r"]));
+  if (!arr.size) trow(tbA, ["—","no one is behind","","",""]);
+  const tbM = $("t_months").querySelector("tbody"); tbM.innerHTML = "";
+  r.missed.forEach(m => trow(tbM,[m.unit,m.tenant,m.month,tag("miss","MISSED"),fmt(m.cents)],[null,null,null,null,"r"]));
+  r.short.forEach(s => trow(tbM,[s.unit,s.tenant,s.month,tag("short","SHORT"),fmt(s.cents_short)],[null,null,null,null,"r"]));
+  const tbC = $("t_chronic").querySelector("tbody"); tbC.innerHTML = "";
+  r.chronic.forEach(c => trow(tbC,[c.unit,c.tenant,String(c.n)],[null,null,"r"]));
+  if (!r.chronic.length) trow(tbC,["—","none at this setting",""]);
+  const tbS = $("t_stray").querySelector("tbody"); tbS.innerHTML = "";
+  r.dup_held.forEach(d => trow(tbS,["duplicate — held",d.payment_id,d.unit,d.date,fmt(d.cents)],[null,null,null,null,"r"]));
+  r.orphans.forEach(o => trow(tbS,["orphan — unit not on the roll",o.payment_id,o.unit,o.date,fmt(o.cents)],[null,null,null,null,"r"]));
+  r.unapplied.forEach(u => trow(tbS,["credit beyond the lease","—",u.unit,"—",fmt(u.cents)],[null,null,null,null,"r"]));
+  r.holdover.forEach(h => trow(tbS,["paid after lease end",h.payment_id,h.unit,h.date,"—"],[null,null,null,null,"r"]));
+  if (!tbS.children.length) trow(tbS,["—","","","",""]);
+  const tbL = $("t_late").querySelector("tbody"); tbL.innerHTML = "";
+  r.late.forEach(l => trow(tbL,[l.unit,l.month,l.paid_day]));
+  if (!r.late.length) trow(tbL,["—","none at this grace setting",""]);
+  const ul = $("refusals"); ul.innerHTML = "";
+  r.refusals_roll.forEach(x => { const li = document.createElement("li"); li.textContent = "rent roll line "+x.line+": "+x.reason; ul.appendChild(li); });
+  r.refusals_pay.forEach(x => { const li = document.createElement("li"); li.textContent = "payments line "+x.line+": "+x.reason; ul.appendChild(li); });
+  if (!ul.children.length){ const li = document.createElement("li"); li.textContent = "none — every row was readable"; ul.appendChild(li); }
+  $("selfaudit").textContent = "self-audit: "+r.self_audit+" · rent roll "+r.counts.roll_ok+"/"+r.counts.roll_total+" rows kept · payments "+r.counts.pay_ok+"/"+r.counts.pay_total+" kept · audited through "+r.audit_end;
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,61 @@
+THE RENT ROLL AUDITOR — the three prompts, exactly as used on camera (Build It With AI, EP40)
+
+────────────────────────────────────────────────────────────────────────
+PROMPT 1 — the naive ask (produced v1.html, preserved with its lies labeled)
+────────────────────────────────────────────────────────────────────────
+Build me one self-contained HTML file for a small landlord — no internet access, no
+account, no libraries fetched from anywhere, everything inline. I will paste in two CSV
+exports: a rent roll with the header unit,tenant,monthly_rent,lease_start,lease_end,deposit
+and a payments ledger with the header payment_id,date,unit,amount,method. The page should
+read both and tell me whether the rent that should have arrived actually did — a collection
+rate, a verdict, and a simple month-by-month chart.
+
+────────────────────────────────────────────────────────────────────────
+PROMPT 2 — the grid (produced v2.html, preserved with its lies labeled)
+────────────────────────────────────────────────────────────────────────
+Rebuild it month by month instead of as one total. Every lease owes every month from its
+lease start date. Payments land against those months. Show me every month that stands
+open: unit, tenant, month, what was paid against it and what the rent is. No more
+portfolio-level averages — I want to see exactly who is behind and when.
+
+────────────────────────────────────────────────────────────────────────
+PROMPT 3 — the law (produced rent-roll-auditor.html, the shipped tool)
+────────────────────────────────────────────────────────────────────────
+Rewrite it under these rules, exactly:
+
+1. Money lives as an integer count of cents, rounded half-up once at parse. Dates are ISO
+   (YYYY-MM-DD) only, and impossible calendar dates are refused.
+2. The audit runs through the last full calendar month ending on or before the latest valid
+   payment date. Each lease owes every calendar month from lease_start through lease_end
+   (or through the audit end if lease_end is blank); a mid-month start or end is prorated
+   by days, rounded half-up.
+3. A payment settles its unit's OLDEST unpaid month first and the overflow rolls forward —
+   so rent paid early still counts, and a shortfall rides forward instead of hiding. Money
+   left after every owed month is full is "credit beyond the lease", flagged, and a payment
+   dated after lease_end is flagged as paid-after-lease-end.
+4. A payment that exactly matches an earlier one — same unit, same date, same amount — is
+   HELD as a suspected duplicate, listed by payment id, and never applied to balances.
+5. A payment whose unit is not on the rent roll is an ORPHAN: listed with its dollars,
+   never allocated, never guessed onto a "similar" unit.
+6. Refuse what you cannot read, out loud, line by line, with the reason: bad dates,
+   non-numeric or negative or zero amounts (a negative is a refund, not rent income), blank
+   units or tenants, duplicate payment ids, duplicate units on the roll, rent that is not a
+   positive number. Refused rows take no further part.
+7. Findings at the end of the window: MISSED months (nothing paid), SHORT months (partial,
+   with a forgiveness dial), LATE months (rent not fully in by the grace day — the
+   completion date is the payment that brought the month to paid-in-full net of the
+   forgiveness dial), and chronically late tenants. Three dials belong to me: grace day
+   (late after the 4th / 6th / 11th), forgiven shortfall ($0 / $5 / $20), and how many late
+   months make a tenant chronic (2 / 3 / 5).
+8. Headline: scheduled rent, money applied to rent, uncollected dollars and percent. When
+   uncollected passes 5% of scheduled, show a banner reading DO NOT CALL THIS COLLECTED.
+9. The page audits itself on every run: rows re-tallied two ways, a conservation check
+   (allocated + credit + held + orphans must equal the valid payment total), the suspect
+   list recounted independently, and a refusal-rate check. If any self-check fails, or a
+   file is too mangled to vouch for (more than a quarter of its rows refused, or a wrong
+   header), withhold all findings and show DO NOT TRUST THIS AUDIT with the reason.
+10. Everything stays on my computer: no network requests of any kind, ever.
+
+────────────────────────────────────────────────────────────────────────
+The sample portfolio ("Quillbrook Properties") is fictional. Every flaw in it was planted
+on purpose so the audits could be checked against a known answer.
