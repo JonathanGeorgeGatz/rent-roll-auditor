@@ -4,111 +4,338 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>The Rent Roll Auditor</title>
+<meta name="description" content="Free, offline rent roll auditor: rent roll + payments ledger in, every payment proves which month it paid — missed, short and late months, duplicates, orphans, holdovers.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='8' y='4' width='46' height='56' rx='3' fill='%231d4466'/%3E%3Crect x='14' y='4' width='40' height='56' rx='2' fill='%23f6f0e1'/%3E%3Cpath d='M20 18h28M20 26h28M20 34h28M20 42h28' stroke='%23a9bfd6' stroke-width='2'/%3E%3Cpath d='M24 10v50' stroke='%23b0333e' stroke-width='2'/%3E%3Cpath d='M42 4v20l5-4 5 4V4z' fill='%23b0333e'/%3E%3C/svg%3E">
+<!-- IDENTITY: "Ledger Book" — cream ruled paper, red margin line, serif ink, folder-tab section dividers, rubber-stamp verdicts,
+     12-month rent ledger grid as the signature visual. (11-27 identity rule; engine untouched) -->
 <style>
-:root{--ink:#22303B;--paper:#F7F6F2;--card:#FFFFFF;--blue:#1B4F72;--blue2:#28618A;--wine:#74323E;--line:#D9D5CC;--ok:#2E6B4F;--warn:#8A5A1C;--bad:#8E2D2D;--mut:#6B7680}
+:root{
+  --paper:#f3ecdc; --sheet:#fbf7ec; --sheet-2:#f4eedf; --ink:#1b2a3a; --blue:#1d4466; --blue-2:#2f5f8a; --mute:#5d6672; --dim:#8b8f93;
+  --rule:rgba(47,95,138,.14); --rule-2:rgba(47,95,138,.28); --margin:#c7505a; --red:#9b2632; --red-bg:#f6e1df; --ochre:#8f5d0d; --ochre-bg:#f5e9cf;
+  --green:#2c6b4a; --green-bg:#e2efe5; --edge:#e2d8c2; --tab1:#1d4466; --tab2:#9b2632; --tab3:#8f5d0d; --tab4:#3d5a40;
+  --serif:Charter,"Bitstream Charter","Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,"Times New Roman",serif;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){
+  --paper:#0e1622; --sheet:#152131; --sheet-2:#1a283a; --ink:#ebe4d3; --blue:#9cc0e6; --blue-2:#b9d3ee; --mute:#a9b2bd; --dim:#78828e;
+  --rule:rgba(156,192,230,.08); --rule-2:rgba(156,192,230,.18); --margin:#d9707a; --red:#f0848b; --red-bg:#3a1a1e; --ochre:#e7b45c; --ochre-bg:#33270f;
+  --green:#7fcf9f; --green-bg:#14301f; --edge:#0a111a; --tab1:#3f6f9e; --tab2:#b8434e; --tab3:#a87420; --tab4:#4f7a55;}}
+:root[data-theme=dark]{
+  --paper:#0e1622; --sheet:#152131; --sheet-2:#1a283a; --ink:#ebe4d3; --blue:#9cc0e6; --blue-2:#b9d3ee; --mute:#a9b2bd; --dim:#78828e;
+  --rule:rgba(156,192,230,.08); --rule-2:rgba(156,192,230,.18); --margin:#d9707a; --red:#f0848b; --red-bg:#3a1a1e; --ochre:#e7b45c; --ochre-bg:#33270f;
+  --green:#7fcf9f; --green-bg:#14301f; --edge:#0a111a; --tab1:#3f6f9e; --tab2:#b8434e; --tab3:#a87420; --tab4:#4f7a55;}
 *{box-sizing:border-box}
-body{margin:0;font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--paper)}
-header{background:var(--blue);color:#F2EFE8;padding:26px 20px 22px}
-header .wrap,main{max-width:1060px;margin:0 auto;padding:0 8px}
-h1{margin:0;font-size:30px;letter-spacing:.2px}
-header p{margin:6px 0 0;color:#C9D6E0;max-width:70ch}
-main{padding:22px 8px 60px}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-@media(max-width:860px){.grid{grid-template-columns:1fr}}
-.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px}
-.card h2{margin:0 0 8px;font-size:17px;color:var(--blue)}
-textarea{width:100%;height:150px;font:12px/1.45 ui-monospace,Menlo,Consolas,monospace;border:1px solid var(--line);border-radius:8px;padding:10px;resize:vertical;background:#FCFBF8}
-.row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:14px 0}
-button{font:600 15px/1 inherit;padding:11px 18px;border-radius:8px;border:1px solid var(--blue);background:var(--blue);color:#fff;cursor:pointer}
-button.ghost{background:#fff;color:var(--blue)}
-button:hover{background:var(--blue2)}
-button.ghost:hover{background:#EEF3F7;color:var(--blue)}
-select{font:inherit;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:#fff}
-label{font-size:14px;color:var(--mut)}
-.dial{display:flex;flex-direction:column;gap:4px}
-input[type=file]{font-size:13px}
-#banner,#trust{display:none;margin:18px 0;padding:16px 18px;border-radius:10px;font-size:20px;font-weight:700;letter-spacing:.3px}
-#banner{background:var(--wine);color:#F7E9EC}
-#trust{background:#3A2A12;color:#F3E2C4}
-#banner small,#trust small{display:block;font-size:14px;font-weight:400;margin-top:4px;opacity:.9}
-.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin:18px 0}
-.stat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
-.stat .k{font-size:13px;color:var(--mut)}
-.stat .v{font-size:26px;font-weight:700;color:var(--blue);margin-top:2px}
-.stat .v.bad{color:var(--bad)}
-table{width:100%;border-collapse:collapse;font-size:14px;margin:6px 0 2px}
-th{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);text-align:left;border-bottom:2px solid var(--line);padding:6px 8px}
-td{padding:6px 8px;border-bottom:1px solid var(--line)}
-td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
-.tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px}
-.tag.miss{background:#F4DEDE;color:var(--bad)}
-.tag.short{background:#F3E7D3;color:var(--warn)}
-.tag.late{background:#E2E9F0;color:var(--blue)}
-.sa{font:13px/1.5 ui-monospace,Menlo,Consolas,monospace;color:var(--mut);margin-top:16px}
-.sec{margin-top:22px}
-.sec h2{font-size:18px;color:var(--blue);margin:0 0 6px}
-.sec p.note{font-size:13px;color:var(--mut);margin:0 0 6px}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.55 var(--serif);-webkit-font-smoothing:antialiased}
+a{color:inherit}
+.wrap{max-width:1140px;margin:0 auto;padding:0 16px}
+@media(min-width:760px){.wrap{padding:0 28px}}
+.num,td.r{font-family:var(--mono);font-variant-numeric:tabular-nums}
+/* bar */
+.bar{border-bottom:3px double var(--rule-2);background:var(--paper);position:sticky;top:0;z-index:10}
+.bar .wrap{display:flex;align-items:center;gap:12px;height:58px}
+.mark{display:flex;align-items:center;gap:10px;font:700 18px var(--serif);letter-spacing:.01em;white-space:nowrap;color:var(--blue)}
+.mark svg{flex:none}
+.pill{font:600 12px var(--sans);color:var(--green);border:1px solid color-mix(in srgb,var(--green) 45%,transparent);border-radius:3px;padding:3px 8px;white-space:nowrap;letter-spacing:.02em}
+.sp{flex:1}
+.lnk{color:var(--mute);text-decoration:none;font:600 14px var(--sans);white-space:nowrap}
+.lnk:hover{color:var(--blue);text-decoration:underline}
+.tbtn{appearance:none;border:1px solid var(--rule-2);background:var(--sheet);color:var(--ink);border-radius:3px;padding:6px 10px;font:700 14px var(--sans);cursor:pointer}
+@media(max-width:640px){.hide-s{display:none}}
+/* masthead */
+.mast{display:grid;gap:26px;padding:34px 0 26px;align-items:start}
+@media(min-width:900px){.mast{grid-template-columns:1.35fr 1fr}}
+.eyebrow{font:700 12px var(--sans);letter-spacing:.16em;text-transform:uppercase;color:var(--red)}
+h1{font:700 clamp(32px,4.8vw,52px)/1.06 var(--serif);letter-spacing:-.015em;margin:12px 0 14px;color:var(--blue)}
+h1 i{color:var(--red);font-style:italic}
+.sub{font-size:18px;color:var(--mute);margin:0;max-width:58ch}
+.margin-note{font:italic 15px/1.45 var(--serif);color:var(--red);margin-top:14px;padding-left:14px;border-left:2px solid var(--margin)}
+.index{background:var(--sheet);border:1px solid var(--edge);border-radius:2px;box-shadow:3px 3px 0 var(--edge),6px 6px 0 color-mix(in srgb,var(--edge) 60%,transparent);padding:16px 18px 14px;position:relative;
+  background-image:repeating-linear-gradient(var(--sheet) 0 29px,var(--rule) 29px 30px)}
+.index h3{margin:0 0 6px;font:700 13px var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--blue);display:flex;justify-content:space-between}
+.index h3 span{color:var(--red)}
+.index ul{list-style:none;margin:0;padding:0}
+.index li{display:flex;align-items:baseline;gap:6px;height:30px;font-size:15.5px}
+.index li .dots{flex:1;border-bottom:2px dotted var(--rule-2);transform:translateY(-4px)}
+.index li b{font:600 13px var(--mono);color:var(--red);white-space:nowrap}
+/* sheets + tabs */
+.tabbed{margin-top:34px;position:relative}
+.tab{display:inline-block;font:700 12.5px var(--sans);letter-spacing:.12em;text-transform:uppercase;color:#fff;background:var(--tab1);padding:7px 14px 6px;border-radius:4px 4px 0 0;margin-left:18px;position:relative;z-index:1}
+.tab.t2{background:var(--tab2)} .tab.t3{background:var(--tab3)} .tab.t4{background:var(--tab4)}
+.tab small{font-weight:600;opacity:.8;letter-spacing:.04em;text-transform:none;margin-left:6px}
+.sheet{background:var(--sheet);border:1px solid var(--edge);border-radius:2px;box-shadow:2px 2px 0 var(--edge);position:relative}
+.sheet.lined{background-image:linear-gradient(90deg,transparent 46px,var(--margin) 46px,var(--margin) 47px,transparent 47px)}
+.inner{padding:18px 18px 18px 62px}
+@media(max-width:640px){.inner{padding:16px 14px 16px 30px}.sheet.lined{background-image:linear-gradient(90deg,transparent 18px,var(--margin) 18px,var(--margin) 19px,transparent 19px)}}
+.slips{display:grid;gap:14px;grid-template-columns:minmax(0,1fr)}
+@media(min-width:800px){.slips{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
+.drop{position:relative;display:block;padding:16px 16px 14px;border:1.5px dashed var(--rule-2);border-radius:2px;background:var(--sheet-2);cursor:pointer;transition:border-color .15s,background .15s}
+.drop:hover,.drop.over{border-color:var(--blue);background:color-mix(in srgb,var(--blue) 7%,var(--sheet-2))}
+.drop.loaded{border-style:solid;border-color:color-mix(in srgb,var(--green) 55%,transparent)}
+.drop .no{font:700 12px var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--red)}
+.drop h3{margin:2px 0 2px;font:700 19px var(--serif);color:var(--blue)}
+.drop .hint{color:var(--mute);font-size:14.5px}
+.drop .cols{font:12px var(--mono);color:var(--dim);margin-top:4px;overflow-wrap:anywhere}
+.drop .state{font:700 13px var(--sans);color:var(--green);margin-top:6px}
+.drop .state:empty{display:none}
+.drop input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+.drop:focus-within{outline:2px solid var(--blue);outline-offset:2px}
+details.paste{margin-top:8px;font:14px var(--sans);color:var(--mute)}
+details.paste summary{cursor:pointer;font-weight:600}
+details.paste textarea{display:block;width:100%;height:120px;margin-top:6px;font:12px/1.45 var(--mono);color:var(--ink);background:var(--sheet);border:1px solid var(--rule-2);border-radius:2px;padding:8px;resize:vertical}
+.dials{display:flex;flex-wrap:wrap;gap:0;margin-top:16px;border-top:1px solid var(--rule-2);border-bottom:1px solid var(--rule-2)}
+.dial{flex:1 1 200px;padding:10px 12px 10px 0;display:flex;flex-direction:column;gap:2px}
+.dial+.dial{padding-left:14px;border-left:1px solid var(--rule)}
+@media(max-width:640px){.dial{flex-basis:100%}.dial+.dial{padding-left:0;border-left:0;border-top:1px solid var(--rule)}}
+.dial label{font:700 11.5px var(--sans);letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
+.dial select{font:700 16px var(--serif);color:var(--blue);background:transparent;border:0;border-bottom:1px solid var(--rule-2);border-radius:0;padding:2px 22px 3px 0;cursor:pointer;-webkit-appearance:none;appearance:none;
+  background-image:linear-gradient(45deg,transparent 50%,var(--red) 50%),linear-gradient(135deg,var(--red) 50%,transparent 50%);background-position:calc(100% - 10px) 55%,calc(100% - 5px) 55%;background-size:5px 5px;background-repeat:no-repeat;align-self:flex-start;min-width:120px}
+.dial select:focus{outline:2px solid var(--blue);outline-offset:2px}
+.dial select option{color:#111;background:#fff}
+.actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:16px}
+.btn{appearance:none;font:700 15px var(--sans);padding:11px 18px;border-radius:3px;cursor:pointer;border:1.5px solid var(--blue);background:transparent;color:var(--blue);transition:background .12s,color .12s}
+.btn.primary{background:var(--blue);color:var(--sheet)}
+.btn.primary:hover{background:var(--blue-2);border-color:var(--blue-2)}
+.btn.red{border-color:var(--red);color:var(--red)}
+.btn.red:hover{background:var(--red);color:var(--sheet)}
+.btn.ghost{border-color:var(--rule-2);color:var(--mute)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.samplenote{font:italic 14px var(--serif);color:var(--mute)}
+/* stamps */
+.stamps{display:grid;gap:14px;margin-top:30px}
+.stamp{display:none;align-items:center;gap:18px;padding:16px 20px;background:var(--sheet);border:1px solid var(--edge);border-radius:2px;box-shadow:2px 2px 0 var(--edge)}
+.stamp .ink{flex:none;font:800 clamp(17px,2.4vw,24px)/1.05 var(--sans);letter-spacing:.06em;text-transform:uppercase;padding:9px 14px;border:3px double currentColor;border-radius:4px;transform:rotate(-2.5deg);
+  mix-blend-mode:multiply;opacity:.92}
+.stamp p{margin:0;color:var(--mute);font-size:16px}
+#banner{color:var(--red)} #banner .ink{color:var(--red);background:color-mix(in srgb,var(--red) 6%,transparent)}
+#trust{color:var(--ochre)} #trust .ink{color:var(--ochre);background:color-mix(in srgb,var(--ochre) 6%,transparent)}
+#okstamp .ink{color:var(--green)}
+@media(max-width:640px){.stamp{flex-direction:column;align-items:flex-start}}
+:root[data-theme=dark] .stamp .ink{mix-blend-mode:normal}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]) .stamp .ink{mix-blend-mode:normal}}
+/* totals */
+.totals{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+@media(min-width:900px){.totals{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.tot{padding:16px 18px;border-right:1px solid var(--rule-2);border-bottom:1px solid var(--rule-2);min-width:0}
+@media(min-width:900px){.tot{border-bottom:0}.tot:last-child{border-right:0}}
+@media(max-width:899px){.tot:nth-child(2n){border-right:0}.tot:nth-child(n+3){border-bottom:0}}
+.tot .k{font:700 11.5px var(--sans);letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
+.tot .v{font:700 clamp(18px,2.05vw,23px) var(--mono);font-variant-numeric:tabular-nums;color:var(--blue);margin-top:6px;letter-spacing:-.02em;overflow-wrap:anywhere}
+.tot.hot .v{color:var(--red)}
+.tot.hot .v:after{content:"";display:block;border-bottom:3px double var(--red);margin-top:4px;max-width:260px}
+.tot .d{font:italic 14px var(--serif);color:var(--mute)}
+/* ledger grid (signature) */
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;font:13px var(--sans);color:var(--mute);margin:0 0 12px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.scroll{overflow-x:auto}
+table.ledger{border-collapse:collapse;width:100%;min-width:720px;font-size:14px;table-layout:fixed}
+table.ledger col.uc{width:210px}
+table.ledger td.u,table.ledger th.u{position:sticky;left:0;background:var(--sheet);z-index:1}
+@media(max-width:640px){table.ledger{min-width:560px}table.ledger col.uc{width:128px}table.ledger td.u{font-size:13px;overflow:hidden;text-overflow:ellipsis}table.ledger td.u b{min-width:22px}.m{width:22px}.yr{display:none}}
+table.ledger th{font:700 11px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--dim);padding:6px 4px;border-bottom:2px solid var(--blue);text-align:center;white-space:nowrap}
+table.ledger th.u,table.ledger td.u{text-align:left;padding-left:2px}
+table.ledger td{border-bottom:1px solid var(--rule-2);padding:0;height:34px;text-align:center;white-space:nowrap}
+table.ledger td.u{font-size:15px;padding-right:10px}
+table.ledger td.u b{font:700 13px var(--mono);color:var(--blue);display:inline-block;min-width:28px}
+table.ledger td.u.flag{color:var(--red)}
+table.ledger td.c{border-left:1px solid var(--rule)}
+.m{display:inline-grid;place-items:center;width:28px;height:24px;font:700 13px var(--mono);border-radius:2px}
+.m.ok{color:var(--blue);opacity:.75}
+.m.late{color:var(--ochre);background:var(--ochre-bg)}
+.m.short{color:var(--red);background:var(--red-bg);border:1px dashed var(--red)}
+.m.miss{color:var(--sheet);background:var(--red)}
+.m.out{color:var(--dim);opacity:.5}
+table.ledger tfoot td{font:700 12px var(--mono);color:var(--red);border-top:2px solid var(--blue);border-bottom:0;height:30px}
+table.ledger tfoot td.u{font:700 11px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+/* regular tables */
+.grid2{display:grid;gap:22px;grid-template-columns:minmax(0,1fr)}
+@media(min-width:960px){.grid2{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
+.tbl{overflow-x:auto}
+table.t{width:100%;border-collapse:collapse;font-size:15px}
+table.t th{font:700 11px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--dim);text-align:left;padding:8px 8px 6px;border-bottom:2px solid var(--blue);white-space:nowrap}
+table.t td{padding:7px 8px;border-bottom:1px solid var(--rule-2);white-space:nowrap}
+table.t td:nth-child(2){white-space:normal}
+table.t th.r,table.t td.r{text-align:right}
+table.t td.r{font-size:14px}
+table.t tbody tr:hover td{background:color-mix(in srgb,var(--blue) 6%,transparent)}
+.tag{display:inline-block;font:700 10.5px var(--sans);letter-spacing:.08em;padding:2px 7px;border-radius:2px;border:1px solid currentColor}
+.tag.miss{color:var(--red);background:var(--red-bg)}
+.tag.short{color:var(--ochre);background:var(--ochre-bg)}
+.tag.late{color:var(--blue)}
+.note{font:italic 15px/1.45 var(--serif);color:var(--red);margin:0 0 10px;padding-left:12px;border-left:2px solid var(--margin)}
+h2.h{font:700 21px var(--serif);color:var(--blue);margin:0 0 8px}
+h2.h + .note{margin-top:-2px}
+.sub2{margin-top:22px}
+.refuse{list-style:none;margin:0;padding:0}
+.refuse li{font:13.5px/1.5 var(--mono);padding:7px 0;border-bottom:1px solid var(--rule-2);color:var(--ink)}
+.refuse li:last-child{border-bottom:0}
+.sa{display:flex;flex-wrap:wrap;gap:8px}
+.sa span{font:700 12px var(--mono);padding:5px 9px;border-radius:2px;border:1px solid}
+.sa .ok{color:var(--green);background:var(--green-bg);border-color:color-mix(in srgb,var(--green) 40%,transparent)}
+.sa .bad{color:var(--red);background:var(--red-bg);border-color:color-mix(in srgb,var(--red) 40%,transparent)}
 #results{display:none}
-.refuse li{font:13px/1.6 ui-monospace,Menlo,Consolas,monospace}
-footer{border-top:1px solid var(--line);margin-top:40px;padding-top:14px;font-size:13px;color:var(--mut)}
-.badge{display:inline-block;font-size:12px;font-weight:700;color:#fff;background:var(--wine);border-radius:6px;padding:3px 9px;margin-left:8px;vertical-align:middle}
+.empty{margin-top:30px;text-align:center;padding:44px 18px;color:var(--mute)}
+.empty b{display:block;font:700 20px var(--serif);color:var(--blue);margin-bottom:6px}
+.hidden{display:none!important}
+footer{margin-top:44px;border-top:3px double var(--rule-2);padding:22px 0 54px;color:var(--mute);font-size:14.5px;display:grid;gap:6px}
+footer a{color:var(--blue)}
+.fade{animation:fade .35s ease both}
+@keyframes fade{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.stamp .ink{transform:none}}
+@media print{.bar,.mast .index,#inputs,.actions,footer .lnk{display:none!important}body{background:#fff;color:#000}.sheet,.stamp{box-shadow:none}.mast{padding-top:0}.tab{color:#000;background:none;border:1px solid #000}}
+details.more{margin-top:22px;border-top:1px solid var(--rule-2);padding-top:12px}
+details.more summary{cursor:pointer;font:700 19px var(--serif);color:var(--blue);list-style:none}
+details.more summary::-webkit-details-marker{display:none}
+details.more summary:before{content:"▸ ";color:var(--red)}
+details.more[open] summary:before{content:"▾ "}
+details.more summary small{font:italic 15px var(--serif);color:var(--mute);margin-left:6px}
+details.more .tbl{margin-top:8px}
 </style>
 </head>
 <body>
-<header><div class="wrap">
-<h1>The Rent Roll Auditor <span class="badge">runs entirely on your computer</span></h1>
-<p>Two exports — the rent roll and the payments ledger — and every rent payment has to prove which month it paid. Missing months, short months, habitual lates, duplicate deposits, orphan payments and holdovers, each with a name and a dollar amount. Nothing leaves this page.</p>
+<header class="bar"><div class="wrap">
+  <span class="mark"><svg width="26" height="30" viewBox="0 0 26 30" aria-hidden="true"><rect x="1" y="1" width="23" height="28" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M6 9h14M6 14h14M6 19h14M6 24h10" stroke="currentColor" stroke-width="1.4" opacity=".55"/><path d="M8.5 1v28" stroke="#b0333e" stroke-width="1.6"/><path d="M17 1v9l2.5-2 2.5 2V1z" fill="#b0333e"/></svg>The Rent Roll Auditor</span>
+  <span class="pill hide-s">runs offline · files stay on your computer</span>
+  <span class="sp"></span>
+  <a class="lnk hide-s" href="https://jonathangeorgegatz.github.io/tools/" target="_blank" rel="noopener">More free tools</a>
+  <button class="tbtn" id="theme" aria-label="Toggle dark mode">◐</button>
 </div></header>
-<main>
-<div class="grid">
-<div class="card"><h2>1 · Rent roll CSV</h2>
-<p class="note" style="font-size:13px;color:var(--mut);margin:0 0 8px">Header: <code>unit,tenant,monthly_rent,lease_start,lease_end,deposit</code> — blank lease_end = month-to-month.</p>
-<textarea id="roll" spellcheck="false" placeholder="unit,tenant,monthly_rent,lease_start,lease_end,deposit"></textarea>
-<div class="row"><input type="file" id="rollfile" accept=".csv,text/csv"></div></div>
-<div class="card"><h2>2 · Payments CSV</h2>
-<p class="note" style="font-size:13px;color:var(--mut);margin:0 0 8px">Header: <code>payment_id,date,unit,amount,method</code> — ISO dates (2026-03-02).</p>
-<textarea id="pay" spellcheck="false" placeholder="payment_id,date,unit,amount,method"></textarea>
-<div class="row"><input type="file" id="payfile" accept=".csv,text/csv"></div></div>
-</div>
-<div class="row" style="margin-top:18px">
-<div class="dial"><label for="grace">Grace period (late after)</label>
-<select id="grace"><option value="3">the 4th</option><option value="5" selected>the 6th</option><option value="10">the 11th</option></select></div>
-<div class="dial"><label for="tol">Forgive shortfalls up to</label>
-<select id="tol"><option value="0">$0</option><option value="500" selected>$5</option><option value="2000">$20</option></select></div>
-<div class="dial"><label for="rep">Chronically late after</label>
-<select id="rep"><option value="2">2 late months</option><option value="3" selected>3 late months</option><option value="5">5 late months</option></select></div>
-<button id="run">Audit the books</button>
-<button id="sample" class="ghost">Load the sample portfolio</button>
-</div>
-<div id="banner">DO NOT CALL THIS COLLECTED<small id="bannersub"></small></div>
-<div id="trust">DO NOT TRUST THIS AUDIT<small id="trustsub"></small></div>
-<div id="results">
-<div class="stats">
-<div class="stat"><div class="k">Scheduled rent (audit window)</div><div class="v" id="s_sched"></div></div>
-<div class="stat"><div class="k">Applied to rent</div><div class="v" id="s_coll"></div></div>
-<div class="stat"><div class="k">Uncollected</div><div class="v bad" id="s_unc"></div></div>
-<div class="stat"><div class="k">Audit through</div><div class="v" id="s_end"></div></div>
-</div>
-<div class="sec"><h2>Who is behind</h2>
-<p class="note">One row per unit with money open at the end of the window — the oldest open month tells you when they fell behind.</p>
-<table id="t_arrears"><thead><tr><th>Unit</th><th>Tenant</th><th class="r">Behind</th><th>Oldest open month</th><th class="r">Open months</th></tr></thead><tbody></tbody></table></div>
-<div class="grid sec">
-<div><h2>Missed &amp; short months</h2>
-<table id="t_months"><thead><tr><th>Unit</th><th>Tenant</th><th>Month</th><th></th><th class="r">Open</th></tr></thead><tbody></tbody></table></div>
-<div><h2>Chronically late</h2>
-<p class="note">Months count as late when the rent was not fully in by the grace day; the dial decides how many make it chronic.</p>
-<table id="t_chronic"><thead><tr><th>Unit</th><th>Tenant</th><th class="r">Late months</th></tr></thead><tbody></tbody></table>
-<h2 style="margin-top:18px">Held &amp; stray money</h2>
-<table id="t_stray"><thead><tr><th>What</th><th>Payment</th><th>Unit</th><th>Date</th><th class="r">Amount</th></tr></thead><tbody></tbody></table></div>
-</div>
-<div class="sec"><h2>Late months (detail)</h2>
-<table id="t_late"><thead><tr><th>Unit</th><th>Month</th><th>Rent fully in on</th></tr></thead><tbody></tbody></table></div>
-<div class="sec"><h2>Refused rows</h2>
-<p class="note">Rows the auditor could not vouch for. Refused out loud, never guessed at.</p>
-<ul class="refuse" id="refusals"></ul></div>
-<div class="sa" id="selfaudit"></div>
-</div>
-<footer>Sample portfolio (“Quillbrook Properties”) is fictional — every flaw in it was planted on purpose. Built on camera for the <em>Build It With AI</em> series; the prompts ride along in the download.</footer>
+
+<main class="wrap">
+  <section class="mast">
+    <div>
+      <div class="eyebrow">Build It With AI · Episode 40 · free tool</div>
+      <h1>Every rent payment has to prove <i>which month it paid.</i></h1>
+      <p class="sub">Two exports — the rent roll and the payments ledger. Missing months, short months, habitual lates, duplicate deposits, orphan payments and holdovers, each with a name and a dollar amount. Nothing leaves this page.</p>
+      <div class="margin-note">A tenant who stops paying doesn't make a unit vacant. The oldest unpaid month always gets paid first.</div>
+    </div>
+    <div class="index" aria-label="What it checks">
+      <h3>Ledger No. 40 <span>checks</span></h3>
+      <ul>
+        <li>Missed months<span class="dots"></span><b>named</b></li>
+        <li>Short months<span class="dots"></span><b>priced</b></li>
+        <li>Habitual lates<span class="dots"></span><b>counted</b></li>
+        <li>Duplicate deposits<span class="dots"></span><b>held</b></li>
+        <li>Orphan payments<span class="dots"></span><b>flagged</b></li>
+        <li>Paid after lease end<span class="dots"></span><b>listed</b></li>
+      </ul>
+    </div>
+  </section>
+
+  <div class="tabbed" id="inputs">
+    <span class="tab">Entries <small>your two exports</small></span>
+    <div class="sheet lined"><div class="inner">
+      <div class="slips">
+        <div>
+          <label class="drop" id="droproll"><input type="file" id="rollfile" accept=".csv,text/csv" aria-label="Choose your rent roll CSV">
+            <span class="no">Slip 1</span><h3>Rent roll</h3><span class="hint">Drop the CSV here or click to choose. Blank lease_end = month-to-month.</span>
+            <div class="cols">unit, tenant, monthly_rent, lease_start, lease_end, deposit</div><div class="state" id="stateroll"></div></label>
+          <details class="paste"><summary>or paste it</summary><textarea id="roll" spellcheck="false" placeholder="unit,tenant,monthly_rent,lease_start,lease_end,deposit"></textarea></details>
+        </div>
+        <div>
+          <label class="drop" id="droppay"><input type="file" id="payfile" accept=".csv,text/csv" aria-label="Choose your payments CSV">
+            <span class="no">Slip 2</span><h3>Payments ledger</h3><span class="hint">Drop the CSV here or click to choose. ISO dates (2026-03-02).</span>
+            <div class="cols">payment_id, date, unit, amount, method</div><div class="state" id="statepay"></div></label>
+          <details class="paste"><summary>or paste it</summary><textarea id="pay" spellcheck="false" placeholder="payment_id,date,unit,amount,method"></textarea></details>
+        </div>
+      </div>
+      <div class="dials">
+        <div class="dial"><label for="grace">Grace period (late after)</label>
+          <select id="grace"><option value="3">the 4th</option><option value="5" selected>the 6th</option><option value="10">the 11th</option></select></div>
+        <div class="dial"><label for="tol">Forgive shortfalls up to</label>
+          <select id="tol"><option value="0">$0</option><option value="500" selected>$5</option><option value="2000">$20</option></select></div>
+        <div class="dial"><label for="rep">Chronically late after</label>
+          <select id="rep"><option value="2">2 late months</option><option value="3" selected>3 late months</option><option value="5">5 late months</option></select></div>
+      </div>
+      <div class="actions">
+        <button class="btn primary" id="run">Audit the books</button>
+        <button class="btn red" id="sample">Try the sample business</button>
+        <span class="samplenote">Quillbrook Properties · 14 units · fictional</span>
+        <span class="sp"></span>
+        <button class="btn ghost" id="csv" disabled>Findings CSV</button>
+        <button class="btn ghost" id="print" disabled>Print</button>
+      </div>
+    </div></div>
+  </div>
+
+  <div class="sheet empty fade" id="empty"><b>The ledger is blank</b>Drop in both files and press “Audit the books” — or press “Try the sample business” to audit the fictional Quillbrook portfolio.</div>
+
+  <div class="stamps" id="stamps">
+    <div class="stamp fade" id="banner" role="alert"><span class="ink">DO NOT CALL THIS COLLECTED</span><p id="bannersub"></p></div>
+    <div class="stamp fade" id="trust" role="alert"><span class="ink">DO NOT TRUST THIS AUDIT</span><p id="trustsub"></p></div>
+    <div class="stamp fade" id="okstamp"><span class="ink">UNDER THE 5% LINE</span><p id="oksub"></p></div>
+  </div>
+
+  <div id="results">
+    <div class="tabbed">
+      <span class="tab">Totals <small>carried forward</small></span>
+      <div class="sheet totals fade">
+        <div class="tot"><div class="k">Scheduled rent</div><div class="v" id="s_sched"></div><div class="d">audit window</div></div>
+        <div class="tot"><div class="k">Applied to rent</div><div class="v" id="s_coll"></div><div class="d">oldest month first</div></div>
+        <div class="tot hot"><div class="k">Uncollected</div><div class="v" id="s_unc"></div><div class="d">named below, unit by unit</div></div>
+        <div class="tot"><div class="k">Audit through</div><div class="v" id="s_end"></div><div class="d" id="s_endd">last full month</div></div>
+      </div>
+    </div>
+
+    <div class="tabbed">
+      <span class="tab t2">The ledger <small>unit × month</small></span>
+      <div class="sheet lined fade"><div class="inner">
+        <div class="legend"><span><i class="m ok">✓</i>paid by the grace day</span><span><i class="m late">L</i>late</span><span><i class="m short">S</i>short</span><span><i class="m miss">✗</i>missed</span><span><i class="m out">·</i>not on lease</span></div>
+        <div class="scroll"><table class="ledger" id="ledger"></table></div>
+      </div></div>
+    </div>
+
+    <div class="tabbed">
+      <span class="tab t2">Who is behind</span>
+      <div class="sheet lined fade"><div class="inner">
+        <p class="note">One row per unit with money open at the end of the window — the oldest open month tells you when they fell behind.</p>
+        <div class="tbl"><table class="t" id="t_arrears"><thead><tr><th>Unit</th><th>Tenant</th><th class="r">Behind</th><th>Oldest open month</th><th class="r">Open months</th></tr></thead><tbody></tbody></table></div>
+      </div></div>
+    </div>
+
+    <div class="tabbed">
+      <span class="tab t3">Missed, short &amp; late</span>
+      <div class="sheet lined fade"><div class="inner">
+        <div class="grid2">
+          <div><h2 class="h">Missed &amp; short months</h2>
+            <div class="tbl"><table class="t" id="t_months"><thead><tr><th>Unit</th><th>Tenant</th><th>Month</th><th></th><th class="r">Open</th></tr></thead><tbody></tbody></table></div></div>
+          <div><h2 class="h">Chronically late</h2>
+            <p class="note">Months count as late when the rent was not fully in by the grace day; the dial decides how many make it chronic.</p>
+            <div class="tbl"><table class="t" id="t_chronic"><thead><tr><th>Unit</th><th>Tenant</th><th class="r">Late months</th></tr></thead><tbody></tbody></table></div></div>
+        </div>
+        <details class="more"><summary>Late months (detail) <small id="n_late">every late month, with the day the rent was fully in</small></summary>
+          <div class="tbl"><table class="t" id="t_late"><thead><tr><th>Unit</th><th>Month</th><th>Rent fully in on</th></tr></thead><tbody></tbody></table></div></details>
+      </div></div>
+    </div>
+
+    <div class="tabbed">
+      <span class="tab t4">Held &amp; stray money</span>
+      <div class="sheet lined fade"><div class="inner">
+        <div class="tbl"><table class="t" id="t_stray"><thead><tr><th>What</th><th>Payment</th><th>Unit</th><th>Date</th><th class="r">Amount</th></tr></thead><tbody></tbody></table></div>
+      </div></div>
+    </div>
+  </div>
+
+  <div class="grid2 hidden" id="tail">
+    <div class="tabbed">
+      <span class="tab t4">Refused rows</span>
+      <div class="sheet lined fade"><div class="inner">
+        <p class="note">Rows the auditor could not vouch for. Refused out loud, never guessed at.</p>
+        <ul class="refuse" id="refusals"></ul>
+      </div></div>
+    </div>
+    <div class="tabbed">
+      <span class="tab">Self-audit</span>
+      <div class="sheet lined fade"><div class="inner"><div class="sa" id="selfaudit"></div></div></div>
+    </div>
+  </div>
+
+  <footer>
+    <div>Sample portfolio (“Quillbrook Properties”) is fictional — every flaw in it was planted on purpose. Most of what gets flagged has a boring explanation: a roommate's half-check, a typo'd unit number.</div>
+    <div>Arithmetic on your own exports, not legal, tax or collections advice. The prompts, spec, sample files and an independent Python checker ride along in the download.</div>
+    <div>Made on <a href="https://www.youtube.com/@jonathangatz" target="_blank" rel="noopener">Build It With AI</a> · <a class="lnk" href="https://jonathangeorgegatz.github.io/tools/" target="_blank" rel="noopener">all the free tools</a></div>
+  </footer>
 </main>
 <script>
 /* EP40 Rent Roll Auditor — engine (the law, prompt 3). Pure, deterministic. */
@@ -347,28 +574,103 @@ const SAMPLE_ROLL = "unit,tenant,monthly_rent,lease_start,lease_end,deposit\r\n1
 const SAMPLE_PAY = "payment_id,date,unit,amount,method\r\nP-0001,2026-01-01,1,1250.00,ach\r\nP-0002,2026-01-01,12,1300.00,ach\r\nP-0003,2026-01-02,11,1400.00,ach\r\nP-0004,2026-01-02,14,760.00,check\r\nP-0005,2026-01-02,14,740.00,ach\r\nP-0006,2026-01-02,2,1300.00,ach\r\nP-0007,2026-01-02,4,1375.00,ach\r\nP-0008,2026-01-02,5,1375.00,ach\r\nP-0009,2026-01-02,7,1650.00,check\r\nP-0010,2026-01-02,9,1250.00,ach\r\nP-0011,2026-01-03,3,1200.00,ach\r\nP-0012,2026-01-03,6,1150.00,ach\r\nP-0013,2026-01-04,8,1225.00,ach\r\nP-0014,2026-01-15,10,1400.00,check\r\nP-0015,2026-01-28,2,1300.00,ach\r\nP-0016,2026-02-01,12,1300.00,ach\r\nP-0017,2026-02-02,1,1250.00,ach\r\nP-0018,2026-02-02,11,1400.00,ach\r\nP-0019,2026-02-02,3,1200.00,ach\r\nP-0020,2026-02-02,7,1650.00,check\r\nP-0021,2026-02-02,9,1250.00,ach\r\nP-0022,2026-02-03,14,760.00,check\r\nP-0023,2026-02-03,14,740.00,ach\r\nP-0024,2026-02-03,4,1375.00,ach\r\nP-0025,2026-02-03,5,1375.00,ach\r\nP-0026,2026-02-03,6,1150.00,ach\r\nP-0027,2026-02-04,8,1225.00,ach\r\nP-0028,2026-02-17,10,1400.00,check\r\nP-0029,2026-02-28,2,1300.00,ach\r\nP-0030,2026-03-01,12,1300.00,ach\r\nP-0031,2026-03-01,4,1375.00,ach\r\nP-0032,2026-03-02,11,1400.00,ach\r\nP-0033,2026-03-02,3,1150.00,ach\r\nP-0034,2026-03-02,5,1375.00,ach\r\nP-0035,2026-03-02,5,1375.00,ach\r\nP-0036,2026-03-02,7,1650.00,check\r\nP-0037,2026-03-02,9,1250.00,ach\r\nP-0038,2026-03-03,1,1250.00,ach\r\nP-0039,2026-03-03,6,1150.00,ach\r\nP-0040,2026-03-04,8,1225.00,ach\r\nP-0041,2026-03-12,14,760.00,check\r\nP-0042,2026-03-12,14,740.00,ach\r\nP-0043,2026-03-14,10,1400.00,check\r\nP-0044,2026-03-16,13,630.65,ach\r\nP-0045,2026-03-28,2,1300.00,ach\r\nP-0046,2026-04-01,1,1250.00,ach\r\nP-0047,2026-04-01,12,1300.00,ach\r\nP-0048,2026-04-02,11,1400.00,ach\r\nP-0049,2026-04-02,13,1150.00,ach\r\nP-0050,2026-04-02,14,760.00,check\r\nP-0051,2026-04-02,14,740.00,ach\r\nP-0052,2026-04-02,3,1150.00,ach\r\nP-0053,2026-04-02,7,1650.00,check\r\nP-0054,2026-04-02,9,1250.00,ach\r\nP-0055,2026-04-03,6,1150.00,ach\r\nP-0056,2026-04-04,8,1225.00,ach\r\nP-0057,2026-04-08,10,1400.00,check\r\nP-0058,2026-04-09,4,1375.00,ach\r\nP-0059,2026-04-28,2,1300.00,ach\r\nP-0060,2026-05-01,12,1300.00,ach\r\nP-0061,2026-05-01,5,1375.00,ach\r\nP-0062,2026-05-02,1,1250.00,ach\r\nP-0063,2026-05-02,13,1150.00,ach\r\nP-0064,2026-05-02,3,1150.00,ach\r\nP-0065,2026-05-02,4,1375.00,ach\r\nP-0066,2026-05-02,7,1650.00,check\r\nP-0067,2026-05-02,9,1250.00,ach\r\nP-0068,2026-05-03,6,1150.00,ach\r\nP-0069,2026-05-04,8,1225.00,ach\r\nP-0070,2026-05-13,14,760.00,check\r\nP-0071,2026-05-13,14,740.00,ach\r\nP-0072,2026-05-19,10,1400.00,check\r\nP-0073,2026-05-28,2,1300.00,ach\r\nP-0074,2026-06-01,1,1250.00,ach\r\nP-0075,2026-06-01,12,1300.00,ach\r\nP-0076,2026-06-02,11,1400.00,ach\r\nP-0077,2026-06-02,13,1150.00,ach\r\nP-0078,2026-06-02,3,1150.00,ach\r\nP-0079,2026-06-02,5,1375.00,ach\r\nP-0080,2026-06-02,7,1650.00,check\r\nP-0081,2026-06-02,9,1250.00,ach\r\nP-0082,2026-06-03,14,760.00,check\r\nP-0083,2026-06-03,14,740.00,ach\r\nP-0084,2026-06-03,4,1375.00,ach\r\nP-0085,2026-06-03,6,1146.00,ach\r\nP-0086,2026-06-04,8,1225.00,ach\r\nP-0087,2026-06-16,10,1400.00,check\r\nP-0088,2026-06-28,2,1300.00,ach\r\nP-0089,2026-07-01,12,1300.00,ach\r\nP-0090,2026-07-01,4,1375.00,ach\r\nP-0091,2026-07-01,5,1375.00,ach\r\nP-0092,2026-07-02,11,1400.00,ach\r\nP-0093,2026-07-02,13,1150.00,ach\r\nP-0094,2026-07-02,14,760.00,check\r\nP-0095,2026-07-02,14,740.00,ach\r\nP-0096,2026-07-02,3,1150.00,ach\r\nP-0097,2026-07-02,7,1650.00,check\r\nP-0098,2026-07-02,9,1250.00,ach\r\nP-0099,2026-07-03,1,1250.00,ach\r\nP-0100,2026-07-03,6,1150.00,ach\r\nP-0101,2026-07-04,8,1225.00,ach\r\nP-0102,2026-07-06,10,1400.00,check\r\nP-0103,2026-07-06,12B,1300.00,ach\r\nP-0104,2026-07-28,2,1300.00,ach\r\nP-0105,2026-08-01,1,1250.00,ach\r\nP-0106,2026-08-01,12,1300.00,ach\r\nP-0107,2026-08-02,11,1400.00,ach\r\nP-0108,2026-08-02,3,1150.00,ach\r\nP-0109,2026-08-02,4,1375.00,ach\r\nP-0110,2026-08-02,9,1250.00,ach\r\nP-0111,2026-08-03,5,1375.00,ach\r\nP-0112,2026-08-03,6,1150.00,ach\r\nP-0113,2026-08-04,8,1225.00,ach\r\nP-0114,2026-08-14,14,760.00,check\r\nP-0115,2026-08-14,14,740.00,ach\r\nP-0116,2026-08-20,10,1400.00,check\r\nP-0117,2026-08-28,2,1300.00,ach\r\nP-0118,2026-09-01,12,1300.00,ach\r\nP-0119,2026-09-02,1,1250.00,ach\r\nP-0120,2026-09-02,11,1400.00,ach\r\nP-0121,2026-09-02,3,1150.00,ach\r\nP-0122,2026-09-02,5,1375.00,ach\r\nP-0123,2026-09-02,9,1250.00,ach\r\nP-0124,2026-09-03,14,760.00,check\r\nP-0125,2026-09-03,14,740.00,ach\r\nP-0126,2026-09-03,6,1150.00,ach\r\nP-0127,2026-09-04,8,1207.00,ach\r\nP-0128,2026-09-11,4,1375.00,ach\r\nP-0129,2026-09-18,10,1400.00,check\r\nP-0130,2026-09-28,2,1300.00,ach\r\nP-0131,2026-10-01,1,1250.00,ach\r\nP-0132,2026-10-01,12,1300.00,ach\r\nP-0133,2026-10-01,5,1375.00,ach\r\nP-0134,2026-10-02,10,1400.00,check\r\nP-0135,2026-10-02,11,1400.00,ach\r\nP-0136,2026-10-02,14,760.00,check\r\nP-0137,2026-10-02,3,1150.00,ach\r\nP-0138,2026-10-02,9,1250.00,ach\r\nP-0139,2026-10-03,4,1375.00,ach\r\nP-0140,2026-10-03,6,1150.00,ach\r\nP-0141,2026-10-04,8,1225.00,ach\r\nP-0142,2026-11-02,14,740.00,ach\r\nP-0007,2026-04-03,12,1300.00,ach\r\nP-0144,2026-02-30,4,1375.00,ach\r\nP-0145,7/15/2026,6,1150.00,ach\r\nP-0146,2026-05-04,8,—,check\r\nP-0147,2026-06-11,10,-200.00,ach\r\nP-0148,2026-08-02,1,0.00,ach\r\n";
 const $ = id => document.getElementById(id);
 const fmt = c => (c/100).toLocaleString("en-US",{style:"currency",currency:"USD"});
-function readFileInto(input, ta){ input.addEventListener("change", () => { const f = input.files[0]; if(!f) return;
-  const r = new FileReader(); r.onload = () => { ta.value = r.result; }; r.readAsText(f); }); }
-readFileInto($("rollfile"), $("roll")); readFileInto($("payfile"), $("pay"));
-$("sample").addEventListener("click", () => { $("roll").value = SAMPLE_ROLL; $("pay").value = SAMPLE_PAY; });
+const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+let last = null, ran = false;
+function rows(t){ return t.trim()? t.replace(/\r\n?/g,"\n").split("\n").filter(l=>l.trim()!=="").length-1 : 0; }
+function loaded(which, name, text){
+  $(which==="roll"?"stateroll":"statepay").textContent = "✓ "+name+" · "+rows(text)+" rows";
+  $(which==="roll"?"droproll":"droppay").classList.add("loaded");
+}
+function wire(input, drop, ta, which){
+  const read = f => { const r = new FileReader(); r.onload = () => { ta.value = r.result; loaded(which, f.name, r.result);
+    if ($("roll").value.trim() && $("pay").value.trim()) { run(); jump(); } }; r.readAsText(f); };
+  input.addEventListener("change", () => { const f = input.files[0]; if (f) read(f); });
+  ["dragenter","dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave","drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+  drop.addEventListener("drop", e => { const f = e.dataTransfer && e.dataTransfer.files[0]; if (f) read(f); });
+}
+wire($("rollfile"), $("droproll"), $("roll"), "roll"); wire($("payfile"), $("droppay"), $("pay"), "pay");
+function jump(){ if (window.innerWidth < 900) { const o = $("stamps"); if (o && o.scrollIntoView) o.scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start"}); } }
+$("sample").addEventListener("click", () => { $("roll").value = SAMPLE_ROLL; $("pay").value = SAMPLE_PAY;
+  loaded("roll","quillbrook_rent_roll.csv",SAMPLE_ROLL); loaded("pay","quillbrook_payments.csv",SAMPLE_PAY); run(); jump(); });
 function trow(tb, cells, classes){ const tr = document.createElement("tr");
   cells.forEach((c,i) => { const td = document.createElement("td"); if(classes && classes[i]) td.className = classes[i];
     if (c instanceof Node) td.appendChild(c); else td.textContent = c; tr.appendChild(td); }); tb.appendChild(tr); }
 function tag(kind, text){ const s = document.createElement("span"); s.className = "tag "+kind; s.textContent = text; return s; }
-$("run").addEventListener("click", () => {
-  const r = RentAudit.audit($("roll").value, $("pay").value, {
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+/* UI-only read of the rent roll for the ledger grid (rows the engine refused are skipped by line number). */
+function rollUnits(text, refused){
+  const lines = text.replace(/\r\n?/g,"\n").split("\n").filter(l => l.trim() !== "");
+  const split = line => { const out=[]; let cur="", q=false; for (let i=0;i<line.length;i++){ const ch=line[i];
+    if (q){ if (ch==='"'){ if(line[i+1]==='"'){cur+='"';i++;} else q=false; } else cur+=ch; }
+    else if (ch==='"') q=true; else if (ch===","){ out.push(cur); cur=""; } else cur+=ch; } out.push(cur); return out.map(c=>c.trim()); };
+  if (!lines.length) return [];
+  const h = split(lines[0]).map(x => x.toLowerCase()); const ix = k => h.indexOf(k);
+  const bad = new Set(refused.map(x => x.line)); const seen = new Set(); const out = [];
+  for (let i = 1; i < lines.length; i++){ if (bad.has(i+1)) continue; const r = split(lines[i]); const u = r[ix("unit")];
+    if (!u || seen.has(u)) continue; seen.add(u);
+    out.push({ unit:u, tenant:r[ix("tenant")]||"", ls:(r[ix("lease_start")]||"").slice(0,7), le:(r[ix("lease_end")]||"").slice(0,7) }); }
+  return out;
+}
+function ledger(r){
+  const units = rollUnits($("roll").value, r.refusals_roll || []);
+  const t = $("ledger"); t.innerHTML = "";
+  if (!units.length){ return; }
+  let start = units.reduce((m,u) => (u.ls && u.ls < m) ? u.ls : m, r.audit_end);
+  const months = []; let [y,mo] = start.split("-").map(Number); const [ey,em] = r.audit_end.split("-").map(Number);
+  while (y < ey || (y === ey && mo <= em)) { months.push(y+"-"+String(mo).padStart(2,"0")); mo++; if (mo>12){mo=1;y++;} if (months.length>36) break; }
+  const key = (u,m) => u+"|"+m; const st = new Map();
+  r.late.forEach(l => st.set(key(l.unit,l.month), {k:"late", t:"late — fully in on "+l.paid_day}));
+  r.short.forEach(s => st.set(key(s.unit,s.month), {k:"short", t:"short "+fmt(s.cents_short)}));
+  r.missed.forEach(m => st.set(key(m.unit,m.month), {k:"miss", t:"missed "+fmt(m.cents)}));
+  const flagged = new Set([...r.missed, ...r.short].map(x => x.unit));
+  const nat = (a,b) => (parseFloat(a.unit)||0)-(parseFloat(b.unit)||0) || String(a.unit).localeCompare(String(b.unit));
+  let h = "<colgroup><col class='uc'>"+months.map(()=>"<col>").join("")+"</colgroup><thead><tr><th class='u'>Unit · tenant</th>"+months.map(m => "<th>"+MON[+m.slice(5)-1]+(m.slice(5)==="01"||m===months[0]?"<span class='yr'> ’"+m.slice(2,4)+"</span>":"")+"</th>").join("")+"</tr></thead><tbody>";
+  const open = months.map(() => 0);
+  for (const u of [...units].sort(nat)){
+    h += "<tr><td class='u"+(flagged.has(u.unit)?" flag":"")+"'><b>"+esc(u.unit)+"</b>"+esc(u.tenant)+"</td>";
+    months.forEach((m,i) => {
+      const onLease = (!u.ls || m >= u.ls) && (!u.le || m <= u.le);
+      const s = st.get(key(u.unit,m));
+      let cell;
+      if (s){ const sym = s.k==="late"?"L":s.k==="short"?"S":"✗"; if (s.k!=="late") open[i]++; cell = "<i class='m "+s.k+"' title='"+esc(MON[+m.slice(5)-1]+" "+m.slice(0,4)+": "+s.t)+"'>"+sym+"</i>"; }
+      else if (onLease) cell = "<i class='m ok' title='paid'>✓</i>";
+      else cell = "<i class='m out' title='not on lease'>·</i>";
+      h += "<td class='c'>"+cell+"</td>";
+    });
+    h += "</tr>";
+  }
+  h += "</tbody><tfoot><tr><td class='u'>Open months</td>"+open.map(n => "<td class='c'>"+(n||"")+"</td>").join("")+"</tr></tfoot>";
+  t.innerHTML = h;
+}
+function show(el, on, disp){ el.style.display = on ? (disp||"block") : "none"; }
+function run(){
+  const r = last = RentAudit.audit($("roll").value, $("pay").value, {
     grace:+$("grace").value, tolerance:+$("tol").value, repeat:+$("rep").value });
-  const show = (el,on) => el.style.display = on ? "block" : "none";
-  if (r.fatal){ show($("trust"),true); $("trustsub").textContent = r.fatal; show($("banner"),false); show($("results"),false); return; }
-  show($("trust"), !!r.trust_banner); if (r.trust_banner) $("trustsub").textContent = r.self_audit;
+  ran = true; $("empty").classList.add("hidden"); $("csv").disabled = $("print").disabled = false;
+  if (r.fatal){ show($("trust"),true,"flex"); $("trustsub").textContent = r.fatal; show($("banner"),false); show($("okstamp"),false); show($("results"),false); $("tail").classList.add("hidden"); return; }
+  show($("trust"), !!r.trust_banner, "flex"); if (r.trust_banner) $("trustsub").textContent = r.self_audit + ". Findings withheld — only the refused rows are shown below.";
   show($("results"), !r.trust_banner);
-  show($("banner"), r.banner && !r.trust_banner);
+  show($("banner"), r.banner && !r.trust_banner, "flex");
+  show($("okstamp"), !r.banner && !r.trust_banner, "flex");
   $("bannersub").textContent = fmt(r.uncollected_cents)+" — "+r.pct_uncollected.toFixed(1)+"% of the scheduled rent — is not in. Past 5%, this page refuses to call the window collected.";
+  $("oksub").textContent = fmt(r.uncollected_cents)+" — "+r.pct_uncollected.toFixed(1)+"% of the scheduled rent — is not in. Still worth a look at the names below.";
+  $("tail").classList.remove("hidden");
+  const ul = $("refusals"); ul.innerHTML = "";
+  r.refusals_roll.forEach(x => { const li = document.createElement("li"); li.textContent = "rent roll line "+x.line+": "+x.reason; ul.appendChild(li); });
+  r.refusals_pay.forEach(x => { const li = document.createElement("li"); li.textContent = "payments line "+x.line+": "+x.reason; ul.appendChild(li); });
+  if (!ul.children.length){ const li = document.createElement("li"); li.textContent = "none — every row was readable"; ul.appendChild(li); }
+  const sa = $("selfaudit"); sa.innerHTML = "";
+  const chip = (cls, txt) => { const s = document.createElement("span"); s.className = cls; s.textContent = txt; sa.appendChild(s); };
+  if (r.self_audit === "OK") chip("ok","✓ self-audit: OK"); else r.self_audit.split("; ").forEach(x => chip("bad","✗ "+x));
+  chip("ok","rent roll "+r.counts.roll_ok+"/"+r.counts.roll_total+" rows kept"); chip("ok","payments "+r.counts.pay_ok+"/"+r.counts.pay_total+" kept");
+  if (r.audit_end) chip("ok","audited through "+r.audit_end);
   if (r.trust_banner) return;
   $("s_sched").textContent = fmt(r.scheduled_cents);
   $("s_coll").textContent = fmt(r.collected_cents);
   $("s_unc").textContent = fmt(r.uncollected_cents)+" ("+r.pct_uncollected.toFixed(1)+"%)";
   $("s_end").textContent = r.audit_end;
+  ledger(r);
   const arr = new Map();
   for (const m of r.missed){ const a = arr.get(m.unit)||{t:m.tenant,c:0,first:m.month,n:0}; a.c+=m.cents; a.n++; if(m.month<a.first)a.first=m.month; arr.set(m.unit,a); }
   for (const s of r.short){ const a = arr.get(s.unit)||{t:s.tenant,c:0,first:s.month,n:0}; a.c+=s.cents_short; a.n++; if(s.month<a.first)a.first=s.month; arr.set(s.unit,a); }
@@ -390,12 +692,31 @@ $("run").addEventListener("click", () => {
   const tbL = $("t_late").querySelector("tbody"); tbL.innerHTML = "";
   r.late.forEach(l => trow(tbL,[l.unit,l.month,l.paid_day]));
   if (!r.late.length) trow(tbL,["—","none at this grace setting",""]);
-  const ul = $("refusals"); ul.innerHTML = "";
-  r.refusals_roll.forEach(x => { const li = document.createElement("li"); li.textContent = "rent roll line "+x.line+": "+x.reason; ul.appendChild(li); });
-  r.refusals_pay.forEach(x => { const li = document.createElement("li"); li.textContent = "payments line "+x.line+": "+x.reason; ul.appendChild(li); });
-  if (!ul.children.length){ const li = document.createElement("li"); li.textContent = "none — every row was readable"; ul.appendChild(li); }
-  $("selfaudit").textContent = "self-audit: "+r.self_audit+" · rent roll "+r.counts.roll_ok+"/"+r.counts.roll_total+" rows kept · payments "+r.counts.pay_ok+"/"+r.counts.pay_total+" kept · audited through "+r.audit_end;
+  $("n_late").textContent = r.late.length+" late month"+(r.late.length===1?"":"s")+" — tap to list them";
+}
+$("run").addEventListener("click", () => { run(); jump(); });
+["grace","tol","rep"].forEach(id => $(id).addEventListener("change", () => { if (ran) run(); }));
+$("csv").addEventListener("click", () => {
+  const r = last; if (!r) return;
+  const rows = [["finding","unit","tenant","month_or_date","amount","detail"]];
+  if (!r.fatal && !r.trust_banner){
+    r.missed.forEach(m => rows.push(["missed month",m.unit,m.tenant,m.month,fmt(m.cents),""]));
+    r.short.forEach(s => rows.push(["short month",s.unit,s.tenant,s.month,fmt(s.cents_short),""]));
+    r.chronic.forEach(c => rows.push(["chronically late",c.unit,c.tenant,"",String(c.n)+" late months",""]));
+    r.late.forEach(l => rows.push(["late month",l.unit,"",l.month,"","fully in on "+l.paid_day]));
+    r.dup_held.forEach(d => rows.push(["duplicate held",d.unit,"",d.date,fmt(d.cents),d.payment_id]));
+    r.orphans.forEach(o => rows.push(["orphan payment",o.unit,"",o.date,fmt(o.cents),o.payment_id]));
+    r.unapplied.forEach(u => rows.push(["credit beyond the lease",u.unit,"","",fmt(u.cents),""]));
+    r.holdover.forEach(h => rows.push(["paid after lease end",h.unit,"",h.date,"",h.payment_id]));
+  }
+  (r.refusals_roll||[]).forEach(x => rows.push(["refused row (rent roll)","","","line "+x.line,"",x.reason]));
+  (r.refusals_pay||[]).forEach(x => rows.push(["refused row (payments)","","","line "+x.line,"",x.reason]));
+  const blob = new Blob([rows.map(r => r.map(c => '"'+String(c).replace(/"/g,'""')+'"').join(",")).join("\n")+"\n"], {type:"text/csv"});
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "rent-roll-findings.csv"; document.body.appendChild(a); a.click(); a.remove();
 });
+$("print").addEventListener("click", () => window.print());
+$("theme").addEventListener("click", () => { const d = document.documentElement;
+  d.dataset.theme = (d.dataset.theme === "dark" || (!d.dataset.theme && matchMedia("(prefers-color-scheme: dark)").matches)) ? "light" : "dark"; });
 </script>
 </body>
 </html>
